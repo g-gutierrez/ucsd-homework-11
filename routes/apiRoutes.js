@@ -1,4 +1,4 @@
-/*
+/*  FROM THE REQUIREMENTS 
 
 GET /api/notes - Should read the db.json file and return all saved notes as JSON.
 
@@ -14,9 +14,14 @@ DELETE /api/notes/:id - Should receive a query parameter containing the id of a 
 // LOAD DATA
 // ===============================================================================
 
-var db = require("../db/db.json");
+var db = require("../data/db.json");
 var fs = require("fs");
-var uuid = require("uiid/v4");
+var util = require("util");
+var {v4 : uuidv4} = require("uuid");
+
+var readAsync = util.promisify(fs.readFile);
+var writeAsync = util.promisify(fs.writeFile);
+
 
 
 // ===============================================================================
@@ -24,27 +29,41 @@ var uuid = require("uiid/v4");
 // ===============================================================================
 
 module.exports = function(app) {
+  
   // API GET Requests
   // ---------------------------------------------------------------------------
 
-  app.get("/api/notes", function(req, res) {
-    res.json(db);
+  app.get("/api/notes", async function(req, res) {
+    fs.readFile("./data/db.json", "utf8", (err, data) => {
+      if (err) throw err;
+      res.json(JSON.parse(data));
+    })
   });
-
-
 
   // API POST Requests
   // ---------------------------------------------------------------------------
 
   app.post("/api/notes", function(req, res) {
-    let noteId = uuid();
+
+    let noteId = uuidv4();
     let newNote = {
       id: noteId,
       title: req.body.title,
       text: req.body.text
     };
-    fs.readFile("./db/db.json", "utf8", (err, data) => {
-      if (err) throw
+
+    fs.readFile("./data/db.json", "utf8", (err, data) => {
+      if (err) throw err;
+
+      const allNotes = JSON.parse(data);
+
+      allNotes.push(newNote);
+
+      fs.writeFile("./data/db.json", JSON.stringify(allNotes, null, 2), err => {
+        if (err) throw err;
+        res.send(db);
+        console.log("Note created!")
+      });
     });
   });
 
@@ -52,11 +71,16 @@ module.exports = function(app) {
   // ---------------------------------------------------------------------------
 
   app.delete("/api/notes/:id", function(req, res) {
-    // Empty out the arrays of data
-    tableData.length = 0;
-    waitListData.length = 0;
-
-    res.json({ ok: true });
+    let noteId = req.params.id;
+    fs.readFile("./data/db.json", (err, data) => {
+      if (err) throw err;
+      var allNotes = JSON.parse(data);
+      var newAllNotes = allNotes.filter(note => note.id != noteId);
+      fs.writeFile("./data/db.json", JSON.stringify(newAllNotes, null, 2), err => {
+        if (err) throw err;
+        res.send(db);
+      });
+    });
   });
 };
 
